@@ -45,12 +45,13 @@ if not os.environ.get("API_KEY"):
 @login_required
 def index():
     """Show portfolio of stocks"""
-    return apology("TODO")
+    return render_template("index.html")
 
 
 @app.route("/buy", methods=["GET", "POST"])
 @login_required
 def buy():
+    isBought = False
     """Buy shares of stock"""
     if request.method == "GET":
         return render_template('buy.html')
@@ -66,15 +67,17 @@ def buy():
             if cash < total_price:
                 apology("can't afford")
             cash -= total_price
-            # app.logger.info(session["user_id"])
-            db.execute('UPDATE users SET cash = :cash WHERE id=:userid', cash=cash, userid=session["user_id"])
-            db.execute("INSERT INTO transactions (price, shares, datetime, symbol, user_id) VALUES (:price, :shares, DateTime('now'), :symbol, :user_id)",price=sym_obj["price"], shares=shares, user_id=session["user_id"], symbol=symbol)
-            # app.logger.info(type(db.execute("SELECT EXISTS(SELECT 1 FROM symbols WHERE symbol=:symbol)", symbol=symbol)))
             result = db.execute("SELECT EXISTS(SELECT 1 FROM symbols WHERE symbol=:symbol)", symbol=symbol)
             string = "EXISTS(SELECT 1 FROM symbols WHERE symbol=" + "'" + symbol + "')"
             if not (result[0][string]):
                 db.execute("INSERT INTO symbols (symbol, name) VALUES(:symbol, :name)", symbol=symbol, name=sym_obj["name"])
-            return redirect("/")
+            symbol_id = db.execute("SELECT id FROM symbols where symbol=:symbol", symbol=symbol)[0]["id"]
+            # app.logger.info(symbol_id)
+            db.execute('UPDATE users SET cash = :cash WHERE id=:userid', cash=cash, userid=session["user_id"])
+            db.execute("INSERT INTO transactions (price, shares, datetime, symbol_id, user_id) VALUES (:price, :shares, DateTime('now'), :symbol_id, :user_id)",price=sym_obj["price"], shares=shares, user_id=session["user_id"], symbol_id=symbol_id)
+            # app.logger.info(type(db.execute("SELECT EXISTS(SELECT 1 FROM symbols WHERE symbol=:symbol)", symbol=symbol)))
+            isBought = True
+            return render_template("index.html", isBought=isBought)
 
 
 
@@ -84,7 +87,9 @@ def buy():
 @login_required
 def history():
     """Show history of transactions"""
-    return apology("TODO")
+    history = db.execute("SELECT price,shares, datetime, symbol_id FROM transactions WHERE user_id=:userid ORDER BY datetime DESC",userid=session["user_id"])
+    app.logger.info(history)
+    return render_template("history.html")
 
 
 @app.route("/login", methods=["GET", "POST"])

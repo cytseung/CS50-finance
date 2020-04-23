@@ -1,2 +1,13 @@
 {% extends "layout.html" %}
 
+{% block title %}
+    Portfolio
+{% endblock %}
+
+{% block main %}
+    {% if isBought == True %}
+    <div class="alert alert-primary" role="alert">
+        Bought!
+    </div>
+    {% endif %}
+{% endblock %}
