@@ -1,0 +1,36 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Register
+{% endblock %}
+
+{% block main %}
+    <form action="/register" method="post">
+        <div class="form-group">
+            <input id="username" autocomplete="off" autofocus class="form-control" name="username" placeholder="Username" type="text">
+        </div>
+        <div class="form-group">
+            <input id="password" class="form-control" name="password" placeholder="Password" type="password">
+        </div>
+        <div class="form-group">
+            <input id="confirmation" class="form-control" name="confirmation" placeholder="Enter password again" type="password">
+            <p id="message" style="color:red;"></p>
+        </div>
+        <button id="submit" class="btn btn-primary" type="submit" disabled>Register</button>
+        
+    </form>
+    <script>
+        document.querySelector('#confirmation').oninput = function(){
+            if (document.querySelector('#password').value != document.querySelector('#confirmation').value || document.querySelector('#username') === '' || document.querySelector('#password') === ''){
+                document.querySelector('#message').innerHTML = "password does not match.";
+                document.querySelector('#submit').disabled = true;
+            }else{
+                document.querySelector('#message').innerHTML = "";
+                document.querySelector('#submit').disabled = false;
+            }
+        }
+        // document.querySelector('#username').onfocusout = function(){
+            
+        // }
+    </script>
+{% endblock %}
