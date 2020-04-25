@@ -45,13 +45,45 @@ if not os.environ.get("API_KEY"):
 @login_required
 def index():
     """Show portfolio of stocks"""
-    return render_template("index.html")
+    if "isBought" not in session:
+        session["isBought"] = False
+    if "isSold" not in session:
+        session["isSold"] = False    
+    isBought = session["isBought"]
+    session["isBought"] = False
+    isSold = session["isSold"]
+    session["isSold"] = False
+    symbols = []
+    shares = []
+    names=[]
+    prices=[]
+    totals=[]
+    portfolio = db.execute("SELECT SUM(shares), symbol_id FROM transactions WHERE user_id = :userid GROUP BY symbol_id HAVING SUM(shares) > 0 ORDER BY symbol_id;", userid=session["user_id"])
+    for dict_item in portfolio:
+        symbol = db.execute("SELECT symbol FROM symbols WHERE id=:symbol_id",symbol_id = dict_item["symbol_id"])[0]["symbol"]
+        symbols.append(symbol)
+        shares.append(dict_item["SUM(shares)"])
+    
+    for symbol,share in zip(symbols,shares):
+        sym_obj = lookup(symbol)
+        names.append(sym_obj["name"])
+        prices.append(usd(sym_obj["price"]))
+        totals.append(sym_obj["price"] * share)
+   
+
+    cash = (db.execute('SELECT cash FROM users where id = :userid', userid = session["user_id"])[0]["cash"])
+    total = sum(totals) + cash
+    cash = usd(cash)
+    total = usd(total)
+    new_totals = [usd(total) for total in totals]
+    iterable = (zip(symbols,names,shares,prices,new_totals))
+    return render_template("index.html", symbols=symbols, shares=shares, iterable=iterable, cash=cash, total=total, isBought=isBought, isSold=isSold)
 
 
 @app.route("/buy", methods=["GET", "POST"])
 @login_required
 def buy():
-    isBought = False
+    session["isBought"] = False
     """Buy shares of stock"""
     if request.method == "GET":
         return render_template('buy.html')
@@ -65,8 +97,9 @@ def buy():
             cash = db.execute('SELECT cash FROM users where id = :userid', userid = session["user_id"])[0]["cash"]
             total_price = sym_obj["price"] * shares
             if cash < total_price:
-                apology("can't afford")
+                return apology("can't afford")
             cash -= total_price
+            # check whether exists in symbol table
             result = db.execute("SELECT EXISTS(SELECT 1 FROM symbols WHERE symbol=:symbol)", symbol=symbol)
             string = "EXISTS(SELECT 1 FROM symbols WHERE symbol=" + "'" + symbol + "')"
             if not (result[0][string]):
@@ -76,20 +109,35 @@ def buy():
             db.execute('UPDATE users SET cash = :cash WHERE id=:userid', cash=cash, userid=session["user_id"])
             db.execute("INSERT INTO transactions (price, shares, datetime, symbol_id, user_id) VALUES (:price, :shares, DateTime('now'), :symbol_id, :user_id)",price=sym_obj["price"], shares=shares, user_id=session["user_id"], symbol_id=symbol_id)
             # app.logger.info(type(db.execute("SELECT EXISTS(SELECT 1 FROM symbols WHERE symbol=:symbol)", symbol=symbol)))
-            isBought = True
-            return render_template("index.html", isBought=isBought)
-
-
-
+            session["isBought"] = True
+            return redirect("/")
 
 
 @app.route("/history")
 @login_required
 def history():
     """Show history of transactions"""
-    history = db.execute("SELECT price,shares, datetime, symbol_id FROM transactions WHERE user_id=:userid ORDER BY datetime DESC",userid=session["user_id"])
-    app.logger.info(history)
-    return render_template("history.html")
+    history = db.execute("SELECT price,shares, datetime, symbol_id FROM transactions WHERE user_id=:userid ORDER BY datetime",userid=session["user_id"])
+    #app.logger.info(history)
+    symbols=[]
+    shares=[]
+    prices=[]
+    datetime=[]
+    # names = []
+
+    for dict_item in history:
+        symbol = db.execute("SELECT symbol FROM symbols WHERE id=:symbol_id",symbol_id = dict_item["symbol_id"])[0]["symbol"]
+        #name = db.execute("SELECT symbol FROM symbols WHERE id=:symbol_id",symbol_id = dict_item["symbol_id"] )[0]["name"]
+        shares.append(dict_item["shares"])
+        prices.append(usd(dict_item["price"]))
+        symbols.append(symbol)
+        datetime.append(dict_item["datetime"])
+        #names.append(name)
+    #iterable = zip(symbols, names,shares,prices,datetime)
+    iterable = zip(symbols, shares,prices,datetime)
+    # cash = db.execute('SELECT cash FROM users where id = :userid', userid = session["user_id"])[0]["cash"]
+    # cash = usd(cash)
+    return render_template("history.html",iterable=iterable)
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -173,7 +221,39 @@ def register():
 @login_required
 def sell():
     """Sell shares of stock"""
-    return apology("TODO")
+    session["isSold"] = False
+    symbols = []
+    shares = []
+    portfolio = db.execute("SELECT SUM(shares), symbol_id FROM transactions WHERE user_id = :userid GROUP BY symbol_id HAVING SUM(shares) > 0 ORDER BY symbol_id;", userid=session["user_id"])
+    for dict_item in portfolio:
+        symbol = db.execute("SELECT symbol FROM symbols WHERE id=:symbol_id",symbol_id = dict_item["symbol_id"])[0]["symbol"]
+        symbols.append(symbol)
+        shares.append(dict_item["SUM(shares)"])
+    sym_dict = dict(zip(symbols, shares))   
+    if request.method == "GET":
+        return render_template("sell.html", symbols=symbols, shares=shares, sym_dict=sym_dict)
+    else:
+        symbol = request.form.get("symbol")
+        shares_to_sell = int(request.form.get("shares"))
+        for k in sym_dict:
+           if symbol == k:
+               shares_avail = sym_dict[symbol]
+               break
+        if shares_to_sell > shares_avail:
+            apology("too many shares")
+        else:
+            sym_obj = lookup(symbol)
+            if not sym_obj: # failed lookup
+                return apology("Stock not found")
+            else:
+                cash = db.execute('SELECT cash FROM users where id = :userid', userid = session["user_id"])[0]["cash"]
+                total_price = sym_obj["price"] * shares_to_sell
+                cash += total_price
+                db.execute('UPDATE users SET cash = :cash WHERE id=:userid', cash=cash, userid=session["user_id"])
+                symbol_id = db.execute("SELECT id FROM symbols where symbol=:symbol", symbol=symbol)[0]["id"]
+                db.execute("INSERT INTO transactions (price, shares, datetime, symbol_id, user_id) VALUES (:price, :shares, DateTime('now'), :symbol_id, :user_id)",price=sym_obj["price"], shares=-shares_to_sell, user_id=session["user_id"], symbol_id=symbol_id)
+                session["isSold"] = True
+                return redirect("/")
 
 
 def errorhandler(e):

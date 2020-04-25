@@ -1,0 +1,53 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Portfolio
+{% endblock %}
+
+{% block main %}
+    {% if isBought == True %}
+    <div class="alert alert-primary" role="alert">
+        Bought!
+    </div> 
+    {% endif %}
+    {% if isSold == True %}
+    <div class="alert alert-primary" role="alert">
+        Sold!
+    </div> 
+    {% endif %}
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Symbol</th>
+                <th>Name</th>
+                <th>Shares</th>
+                <th>Price</th>
+                <th>TOTAL</th>
+            </tr>
+        </thead>
+        <tfoot>
+            <tr>
+                <td colspan="4"></td>
+                <td>{{total}}</td>
+            </tr>
+        </tfoot>
+        <tbody>
+        {% for iter_tuple in iterable %}
+                <tr>
+                    <td>{{ iter_tuple[0] }}</td>
+                    <td>{{ iter_tuple[1] }}</td>
+                    <td>{{ iter_tuple[2] }}</td>
+                    <td>{{ iter_tuple[3] }}</td>
+                    <td>{{ iter_tuple[4] }}</td>
+                </tr>
+        {% endfor %}
+            <tr>
+                <td>CASH</td>
+                <td colspan="3"></td>
+                <td>{{cash}}</td>
+            </tr>
+        </tbody>
+    </table>
+
+        
+{% endblock %}

@@ -1,0 +1,27 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    History
+{% endblock %}
+
+{% block main %}
+    <table class="table table-striped">
+        <tr>
+            <th>Symbol</th>
+            <!-- <th> Name </th> -->
+            <th>Shares</th>
+            <th>Price</th>
+            <th>Transacted</th>
+        </tr>
+        {% for tuple in iterable %}
+        <tr>
+        {% for item in tuple %}
+        
+        <td>{{item}}</td>
+
+        {% endfor %}
+        </tr>
+        {% endfor %}
+
+    </table>
+{% endblock %}
